@@ -33,6 +33,7 @@ class Region(Generic[T]):
     envelope: Envelope
     level: int = 0
 
+
 @dataclass
 class QueryStats:
     """
@@ -44,19 +45,22 @@ class QueryStats:
     nodes_visited: int = 0
     envelope_tests: int = 0
     items_checked: int = 0
-    
+
 
 # ===============================================
 # Spatial Index
 # ===============================================
 class SpatialIndex(ABC, Generic[T]):
     """
-    Base Class cho Spatial Index
+    Base Class cho Spatial Index. Spatial Index được phân thành hai loại:
+    - Static Index: Chỉ build 1 lần duy nhất. Ex: STRTree, Hilbert packed, ...
+    - Dynamic Index: Có thể Insert/Delete data sau khi đã build, Ex: R-tree Guttman, R*, Quadtree... 
     """
+
+    dynamic: bool = False
 
     def __init__(self, items: Iterable[Item[T]] = ()):
         self.stats = QueryStats()
-        self._size = 0
 
         items = list(items)
 
@@ -89,19 +93,55 @@ class SpatialIndex(ABC, Generic[T]):
         Trả ra Region (envelope + level) của từng Node, kể cả leaf
         """
         return iter(())
-    
+
+    def insert(self, item: Item[T]) -> None:
+        """Insert item mới vào index"""
+        self._require_dynamic("insert")
+        self._insert(item)
+        self._size += 1
+
+    def delete(self, item: Item[T]) -> bool:
+        """
+        Xoá item khỏi index. Trả về True nếu xoá thành công, False nếu không tìm thấy. 
+        """
+        self._require_dynamic("delete")
+        removed = self._delete(item)
+        if removed:
+            self._size -= 1
+        return removed
+
     # ===============================================
     # Abstract
     # ===============================================
-
-    @abstractmethod
-    def _build(self, items: list[Item[T]]) -> None: ...
-    
     @abstractmethod
     def _query(self, envelope: Envelope) -> list[Item[T]]: ...
 
     @abstractmethod
     def _nearest(self, point: Point, k: int) -> list[Neighbor[T]]: ...
+
+    # ===============================================
+    # Hooks
+    # ===============================================
+    def _build(self, items: list[Item[T]]) -> None:
+        if not self.dynamic:
+            raise NotImplementedError(
+                f"{self.name} là index tĩnh: phải ghi đè _build() để bulk-load"
+            )
+        for item in items:
+            self._insert(item)
+
+    def _insert(self, item: Item[T]) -> None:
+        raise NotImplementedError
+
+    def _delete(self, item: Item[T]) -> bool:
+        raise NotImplementedError
+
+    def _require_dynamic(self, op: str) -> None:
+        if not self.dynamic:
+            raise TypeError(
+                f"{self.name} là index tĩnh, không hỗ trợ {op}(). "
+                "Muốn thay đổi dữ liệu thì phải xây lại từ đầu."
+            )
 
     # ===============================================
     # Other
