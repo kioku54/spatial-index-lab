@@ -4,14 +4,13 @@ STRtree - Sort-Tile-Recursive R-tree
 
 from __future__ import annotations
  
-import heapq
-import itertools
 import math
 from dataclasses import dataclass, field
-from typing import Iterator, Union
+from typing import Union
 
-from sil.geometric import Envelope, Point
-from sil.base import Item, Neighbor, Region, SpatialIndex
+from sil.geometric import Envelope
+from sil.base import Item
+from sil.core.tree_base import TreeIndex
 
 @dataclass
 class Node:
@@ -28,8 +27,12 @@ class Node:
 
 Entry = Union[Node, Item]
 
-class STRtree(SpatialIndex):
-    """"""
+class STRtree(TreeIndex):
+    """
+    STRtree - Sort-Tile-Recursive (Static index):
+        - Build: 1 lần từ dưới lên: sắp theo X -> cắt lát dọc -> sắp theo Y -> gom M entry thành node
+        - Insert/Delete: không hỗ trợ, muốn thay đổi dữ liệu phải build lại
+    """
 
     def __init__(self, items=(), node_capacity: int = 10):
         if node_capacity < 2:
@@ -86,65 +89,3 @@ class STRtree(SpatialIndex):
             for j in range(0, len(by_y), M):
                 nodes.append(Node(level, by_y[j : j + M]))
         return nodes
-
-    def _query(self, search: Envelope) -> list[Item]:
-        """Tìm mọi đối tượng có intersect với 1 vùng input"""
-        s = self.stats
-        out: list[Item] = []
-        if self.root is None:
-            return out
-    
-        s.envelope_tests += 1
-        if not self.root.envelope.is_intersects(search):
-            return out
-    
-        stack = [self.root]
-        while stack:
-            node = stack.pop()
-            s.nodes_visited += 1
-            for child in node.children:
-                s.envelope_tests += 1
-                if node.is_leaf:
-                    s.items_checked += 1
-                if not child.envelope.is_intersects(search):
-                    continue                      # CẮT TỈA: bỏ nguyên cây con
-                if node.is_leaf:
-                    out.append(child)
-                else:
-                    stack.append(child)
-        return out
-
-    def _nearest(self, point: Point, k: int) -> list[Neighbor]:
-        "Tìm k đối tượng (Item, Distance) gần với điểm input nhất. Xắp xếp từ gần đến xa"
-        s = self.stats
-        if self.root is None:
-            return []
-    
-        tie = itertools.count()  # heapq không so sánh được Node/Item khi khoảng cách bằng nhau
-        s.envelope_tests += 1
-        heap = [(self.root.envelope.min_distance_point(point), next(tie), self.root)]
-        result: list[Neighbor] = []
-    
-        while heap and len(result) < k:
-            dist, _, entry = heapq.heappop(heap)
-            if isinstance(entry, Item):
-                result.append(Neighbor(dist, entry))
-                continue
-            s.nodes_visited += 1
-            for child in entry.children:
-                s.envelope_tests += 1
-                if entry.is_leaf:
-                    s.items_checked += 1
-                d = child.envelope.min_distance_point(point)
-                heapq.heappush(heap, (d, next(tie), child))
-        return result
-
-    def regions(self) -> Iterator[Region]:
-        """Duyệt toàn bộ cây, trả ra Region (envelope + level) của từng node, kể cả leaf"""
-        stack = [self.root] if self.root else []
-        while stack:
-            node = stack.pop()
-            yield Region(node.envelope, node.level)
-            if not node.is_leaf:
-                stack.extend(node.children)
-

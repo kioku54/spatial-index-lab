@@ -49,7 +49,7 @@ def haversine(p: Point, q: Point) -> float:
 @dataclass(frozen=True, slots=True)
 class Envelope:
     """
-    Envelope - Bounding Box - MBR của 1 đối tượng không gian
+    Envelope - Bounding Box - MBR của một hay nhiều đối tượng không gian
 
         max_y ┌────────┐
               │   ╱╲   │
