@@ -1,12 +1,12 @@
 {
   "layer": "full_roads_hbc",
   "n_items": 3451,
-  "build_time_sec": 0.006470457999967039,
+  "build_time_sec": 0.8111516669741832,
   "height": 4,
   "nodes_per_level": {
-    "0": 346,
-    "1": 35,
-    "2": 4,
+    "0": 469,
+    "1": 66,
+    "2": 8,
     "3": 1
   }
 }
